@@ -1,0 +1,74 @@
+-----
+sfpn1
+-----
+Produit terme à terme : la version avec intrinsèques est plus rapide que la version OpenMP, (utilisation d'AVX contre SSE).
+
+Produit scalaire : la version OpenMP compilée avec -O2 est plus rapide (3x) que celle compilée avec -O3 (gcc essaie de trop vectoriser ?).
+Avec -O2, elle est sur le même ordre de grandeur que la version AVX.
+La version AVX ne bénéficie pas des options d'optimisation.
+
+Produit matriciel : pas de vectorisation dans la version scalaire (malgré -O3)
+La version OpenMP est proche en temps de la version scalaire.
+La version AVX est plus rapide et ne profite pas des options d'optimisation.
+
+Remarques :
+    - seg fault dû à l'alignement de C et l'utilisation de store, avec storeu au lieu de store plus d'erreurs
+    - si on remplace malloc par posix_memalign on peut de nouveau utiliser store
+    - version 2 (storeu et malloc) -> vitesse intermédiaire entre la version scalaire et la version avec store.
+
+  AVX v2
+    - version idée de base : FMA successifs avec   1 vecteur res
+      	      	      	     	 	    	   1 vecteur de 8 éléms de A en ligne
+						   1 vecteur de 8 éléms de B en colonne
+      quand la ligne et la colonne sont terminées, on calcule la somme des composantes de res, on obtient un élém de C
+    - version moins rapide que la version scalaire
+    - accès en mémoire coûteux, défauts de cache au niveau de B
+
+=> la vectorisation est utile pour des grands calculs, pas forcément pour des très petits
+=> O3 est utile quand  la vectorisation est évidente
+=> O3 peut être plus lent que O2 dans des cas où le fichier est déjà vectorisé
+=> OpenMP est utile dans des cas où la vectorisation optimale n'est pas évidente pour le compilateur (e.g. cas où besoin de reduction) mais quand même apparente (structure qui s'y prête).
+=> AVX est utile dans tous les cas (même avec une vectorisation, AVX est plus rapide que SSE), mais surtout quand le programme n'a pas la bonne structure (mais plus lourd en code).
+
+
+---------------
+Knights Landing
+---------------
+
+Produit terme à terme : vectorisation de la version scalaire en SSE à la compilation avec icc en utilisant uniquement l'option -xMIC-AVX512.
+On force la non vectorisation avec -no-vec.
+
+L'option -O1 de icc semble bloquer la vectorisation par OpenMP.
+
+Sur les cas simples (produits scalaire et terme à terme), la version OpenMP vectorisée est plus rapide que la version avec les intrinsèques (produit scalaire avec un facteur de 2), 
+c'est peut-être dû au fait qu'OpenMP est optimisé pour les boucles simples alors qu'on utilise plutôt les intrinsèques dans les cas où la vectorisation n'est pas évidente pour le compilateur (matmul).
+
+Sur le produit matriciel, le temps de la version OpenMP est proche de celui de la version scalaire, sauf avec l'option O3, où elle est plus lente (facteur de 3).
+Les intrinsèques AVX512 sont les plus performantes par rapport aux autres versions sur le produit matriciel surtout sur les versions sans optimisations.
+
+
+Conclusion
+----------
+
+Les versions vectorisée sont toujours plus rapides que les versions scalaires correspondantes sauf dans le cas où la vectorisation forcée n'est pas efficace (OpenMP sur matmul).
+Elles ne bénéficient pas des options d'optimisation ou très peu. Parmi elles, les vectorisation avec AVX2 sont plus efficaces que celles avec SSE, et on peut supposer que plus la taille du vecteur est grand, plus le programme est efficace (AVX512>AVX2>SSE).
+Les intrinsèques sont beaucoup plus efficaces que la vectorisation OpenMP quand la structure du programme n'est pas idéale pour OpenMP, auquel cas même une version séquentielle optimisée pourra être plus rapide.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
